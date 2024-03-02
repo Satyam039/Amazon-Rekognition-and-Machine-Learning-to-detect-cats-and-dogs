@@ -82,6 +82,142 @@ Click `Start Labelling`  and go through each page of images
 - Type `dog` and select the `dog` label and click `Assign`
 
 Once you have done all pages, scroll to the top and click `Save Changes`.  
+
+STAGE 2 - Create the ECR repository and build the Docker image
+Navigate to the ECR console: https://us-east-1.console.aws.amazon.com/ecr/home?region=us-east-1
+
+Click the "Get started" button on the right-hand side.
+
+Make sure to select "Private" and enter "skynet-repo" as the name of the repository.
+
+Click the "Create repository" button.
+
+We need the URI of the repository that we just created. It will have the following format:
+
+<AWS Account ID>.dkr.ecr.us-east-1.amazonaws.com/skynet-repo
+
+The <AWS Account ID> is the ID of your AWS account. You can find it in the upper-right corner of the AWS console.
+
+Navigate to the EC2 console: https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:sort=instanceState
+
+Click Instances in the left menu.
+
+Locate and select the AWS-EC2-Docker instance.
+
+Right-click and select Connect.
+
+Select Session Manager and click Connect.
+
+In the terminal window, enter the following commands:
+
+sudo amazon-linux-extras install docker -y
+sudo service docker start
+sudo usermod -a -G docker ec2-user
+sudo su - ec2-user
+unzip app.zip
+Next we are going to build and push the Docker image to the ECR repository. Enter the following commands replacing the <AWS Account ID> with the ID of your AWS account you copied in the previous step (you can find it in the upper-right corner of the AWS console):
+
+Build the Docker image: docker build -t skynet .
+Tag the Docker image: docker tag skynet:latest <AWS Account ID>.dkr.ecr.us-east-1.amazonaws.com/skynet-repo:latest
+Login to the ECR repository: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <AWS Account ID>.dkr.ecr.us-east-1.amazonaws.com
+Push the Docker image to the ECR repository: docker push <AWS Account ID>.dkr.ecr.us-east-1.amazonaws.com/skynet-repo:latest
+Once the docker push command is completed, navigate to the ECR console: https://us-east-1.console.aws.amazon.com/ecr/home?region=us-east-1
+
+Click on the repository that you created in the previous step.
+
+You should see an image in the ECR repository with the "latest" tag under the Image tag column. Click on it to see the details and copy the URI of the image for the next stage. You should have something similar to this:
+
+<AWS Account ID>.dkr.ecr.us-east-1.amazonaws.com/skynet-repo:latest
+
+
+STAGE 3 - Create the ECS cluster, ECS task definition and ECS service
+STAGE 3A - Create the ECS cluster
+Move to the ECS console: https://us-east-1.console.aws.amazon.com/ecs/home?region=us-east-1#
+
+Select the new ECS experience in the left-hand menu to see the new ECS console.
+
+In the left-hand menu, click on “Clusters” and then click on the “Create cluster” button.
+
+Enter SkynetCluster as the name of the cluster.
+
+In the networking section select the VPC with the name A4L-VPC and the only subnet that is available.
+
+Click “Create” button.
+
+STAGE 3B - Create the ECS task definition
+Before you can continue, you will need to have the stage 1 completed.
+
+In the left-hand menu, click on “Task definitions”.
+
+Click “Create new task definition” button.
+
+Enter “SkynetTaskDefinition” as the name of the task definition.
+
+In the container details section enter the following details:
+
+Container name: skynet
+Image URI: The one you got in the previous stage
+In the environment variables section add the following ones:
+
+Key: BUCKET_NAME
+
+Value: The output "S3BucketName" from the Cloudformation stack you deployed
+
+Key: MODEL_ARN
+
+Value: The one you got in the first stage
+
+Click “Next” button.
+
+In the Task size section change the CPU and Memory values to the following ones:
+
+CPU: .5 vCPU
+Memory: 1 GB
+Use the output ECSRoleName from the Cloudformation stack you deployed for both the task role and the task execution role sections.
+
+In the Monitoring and logging section uncheck “Use log collection”.
+
+Click “Next” button and then click “Create” button.
+
+STAGE 3C - Create the ECS service
+In the left-hand menu, click on “Task definitions”.
+
+Select the “SkynetTaskDefinition” task definition, click “Deploy” button and then click “Create service”.
+
+In the existing cluster section select “SkynetCluster”.
+
+In the computer options section select Launch type and make sure the “FARGATE” launch type is selected.
+
+In the deployment configuration section enter “SkynetService” as the service name.
+
+In the networking section enter the following details:
+
+VPC: A4L-AWS
+Subnets: The only subnet that is available
+Security group: The output "SecurityGroup" from the Cloudformation stack you deployed
+Public IP: Turned on
+Click “Create” button.
+
+STAGE 4 - Test the application
+After 3-5 minutes, you should see the service “SkynetService” with the status “Active”.
+
+Click the “Tasks” tab and then click the task available to see the details. Get the Public IP of the task and paste in a new tab. You should get access to a simple web page where you can upload files of cats and dog to validate the model we trained in a previous stage. Bear in mind the following:
+
+You need to upload a file with a cat or a dog but not a picture that contains both. If you upload a picture with both, the model will not be able to predict the correct class. The result of the prediction will be displayed in the web page with a single result (cat or dog).
+The maximum size of the file is 15MB.
+The file must be in JPG or PNG format.
+The maximum for both width and height is 4096 pixels.
+
+
+
+
+
+
+
+
+
+
+
 Make sure you see `0` unlabelled images.  
 
 Click on the top-right "Train model" button. In the next screen, click on the "Train model" button and then click again on the "Train model" button that appears in the pop-up window.
