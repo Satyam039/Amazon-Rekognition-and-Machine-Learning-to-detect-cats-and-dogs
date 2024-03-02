@@ -1,4 +1,6 @@
-You need to upload a file with a cat or a dog but not a picture that contains both. If you upload a picture with both, the model will not be able to predict the correct class. The result of the prediction will be displayed in the web page with a single result (cat or dog).
-The maximum size of the file is 15MB.
-The file must be in JPG or PNG format.
-The maximum for both width and height is 4096 pixels
+
+
+
+
+
+
